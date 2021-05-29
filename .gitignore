@@ -1,0 +1,12 @@
+dataset/*
+*.pyc
+*.json
+/**/*.pyc
+checkpoints/*
+*.ods
+res/*
+*.csv
+checkpoints/
+.DS_Store
+*.joblib
+*.sav
