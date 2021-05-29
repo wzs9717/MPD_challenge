@@ -1,0 +1,9 @@
+matplotlib
+pandas
+scipy
+seaborn
+numpy
+scikit_learn==0.24.0
+tensorflow==2.3
+joblib
+lightgbm
