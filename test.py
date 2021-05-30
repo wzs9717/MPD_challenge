@@ -1,12 +1,11 @@
-
-import pandas as pd
-import json
-file_name='./data/mpd.slice.0-999.json'
-output_name='res.csv'
-
-data = json.load(open(file_name))
-df = pd.DataFrame(data["playlists"]).head(10)
-
-df=df.drop(["pid","description"],axis=1)
-
-df.to_csv(output_name, index = None)
+import numpy as np
+X = np.array([[1, 1], [2, 1], [3, 1.2], [4, 1], [5, 0.8], [6, 1]])
+from sklearn.decomposition import NMF
+model = NMF(n_components=3, init='random', random_state=0)
+W = model.fit_transform(X)
+H = model.components_
+X_new = np.array([[1, 0], [1, 6.1], [1, 0], [1, 4], [3.2, 1], [0, 4]])
+W_new = model.transform(X_new)
+print(W)
+print(H)
+print(W_new)
