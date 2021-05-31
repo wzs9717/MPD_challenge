@@ -13,6 +13,7 @@ from surprise.prediction_algorithms.knns import KNNBasic,KNNWithMeans,KNNWithZSc
 import numpy as np
 import pickle
 import pandas as pd 
+import scipy.sparse as sp
 cat_feat_list_catboost=['city','shopId','currency']
 
 def define_Hyper_pare():       
