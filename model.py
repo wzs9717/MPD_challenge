@@ -96,7 +96,7 @@ class TwoStageModel:
                 pickle.dump(model, open(saved_model_name, 'wb'))
                 prob_train=model.transform(train_X)
                 return prob_train
-
+        
         def train_second_stage_model(self,train_X,train_Y):
                 print('\n----------->>fitting 2nd model: ')
                 #1.-------------------------------------------train the model-------------------------------------------
