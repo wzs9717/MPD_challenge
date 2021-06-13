@@ -2,13 +2,14 @@ import pandas as pd
 import numpy as np
 from sklearn.utils import resample
 from sklearn.model_selection import train_test_split
+from co_occurence_features import create_co_occurence_features
 
 def data_gene():
     df_m=pd.read_csv('./new_data/pl_track_map_test.csv')
     df_p=pd.read_csv("./new_data/play_list.csv")
     df_t=pd.read_csv("./new_data/tracks.csv")
     df_map=df_m.head(5000)
-   
+  
     df_map["target"]=1
     df_a=df_m.tail(2000)#这个是随机抽样Pos的那个
     df_b=df_map.head(1000)#这个是不变的那个pid
@@ -23,6 +24,8 @@ def data_gene():
     df_test['target']=0
     df_total=pd.concat((df_map,df_test),axis=0) 
     df_p_map=df_total.merge(df_p, left_on='pid',right_on='pid').merge(df_t, left_on='tid',right_on='tid')
+    track_map=create_co_occurence_features(df_p_map)
+   
     #print(df_p_map)
     df_p_map.to_csv('./whole_feature.csv')
     #---------------------------------------------------------------------------
@@ -38,7 +41,7 @@ def data_gene():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     return X_train,X_test,y_train,y_test
     
-   
+if __name__=='__main__':
     
-    
+    data_gene()
     
