@@ -7,38 +7,36 @@ from collections import defaultdict
 from sklearn.preprocessing import LabelEncoder
 
 
-
-data = pd.read_csv('./456.csv')
-data = data.drop_duplicates(['pid', 'tid'])
-
-num_items = data.tid.max() + 1
-num_users =  data.pid.max() + 1
-
-co_occurence = [defaultdict(int) for i in range(num_items)]
-occurence = [0 for i in range(num_items)]
-for q, (_, df) in enumerate(data.groupby('pid')):
-    if q % 100000 == 0:
-        print(q / 10000)
-    tids = list(df.tid)
-    for i in tids:
-        occurence[i] += 1
-    for k, i in enumerate(tids):
-        for j in tids[k + 1:]:
-            co_occurence[i][j] += 1
-            co_occurence[j][i] += 1
-            
-            
-def get_f(i, f):
-    if len(i) == 0:
-        return -1
-    else:
-        return f(i)
     
 def create_co_occurence_features(df):
+    df = df.drop_duplicates(['pid', 'tid'])
     
+    num_items = df.tid.max() + 1
+    num_users =  df.pid.max() + 1
+    
+    co_occurence = [defaultdict(int) for i in range(num_items)]
+    occurence = [0 for i in range(num_items)]
+    for q, (_, df) in enumerate(df.groupby('pid')):
+        if q % 100000 == 0:
+            print(q / 10000)
+        tids = list(df.tid)
+        for i in tids:
+            occurence[i] += 1#
+        for k, i in enumerate(tids):
+            for j in tids[k + 1:]:
+                co_occurence[i][j] += 1
+                co_occurence[j][i] += 1
+                #全是一的方阵
+                
+    def get_f(i, f):#
+        if len(i) == 0:
+            return -1
+        else:
+            return f(i)
+        
     pids = df.pid.unique()
-    seed = data[data.pid.isin(pids)]
-    tid_seed = seed.groupby('pid').tid.apply(list)
+    seed = df[df.pid.isin(pids)]
+    tid_seed = seed.groupby('pid').tid.apply(list)#？？？？
     
     co_occurence_seq = []
     for pid, tid in df[['pid', 'tid']].values:
@@ -60,16 +58,12 @@ def create_co_occurence_features(df):
     df['co_occurence_norm_mean'] = [get_f(i, np.mean) for i in co_occurence_seq]
     df['co_occurence_norm_median'] = [get_f(i, np.median) for i in co_occurence_seq]
     
-    
-train = pd.read_hdf('df_data/ii_candidate.hdf')
-val = pd.read_hdf('df_data/iii_candidate.hdf')
-test = pd.read_hdf('df_data/test_candidate.hdf')
+    return df
 
-create_co_occurence_features(train)
-create_co_occurence_features(val)
-create_co_occurence_features(test)
+# if __name__=='__main__':
 
-train.to_hdf('df_data/ii_co_occurence_features.hdf', key='abc')
-val.to_hdf('df_data/iii_co_occurence_features.hdf', key='abc')
-test.to_hdf('df_data/test_co_occurence_features.hdf', key='abc')
+#     track_map = pd.read_csv('./new_data/pl_track_map_test.csv')
+
+#     track_map=create_co_occurence_features(track_map)
+
 
