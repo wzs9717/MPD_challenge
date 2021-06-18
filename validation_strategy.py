@@ -8,8 +8,8 @@ def validation():
     df_tracks = pd.read_csv('./new_data/tracks.csv')
     df_playlists = pd.read_csv('./new_data/play_list.csv') 
     df_playlists_map= pd.read_csv('./new_data/pl_track_map.csv')
-    df_test=pd.read_csv('./new_data/pl_test.csv')
-    df_test_map=pd.read_csv('./new_data/pl_test_map_validation.csv')
+    df_test=pd.read_csv('./new_data/play_list_test.csv')
+    df_test_map=pd.read_csv('./new_data/pl_track_map_test.csv')
     
     num_tracks = df_playlists.groupby('num_tracks').pid.apply(np.array)
     # num_pl, pl_name_list
@@ -54,16 +54,17 @@ def validation():
     val1 = df_playlists_map[val1_index]
     val2 = df_playlists_map[val2_index]
     
-    val1_pids = np.hstack([val1_playlist[i] for i in val1_playlist])
-    val2_pids = np.hstack([val2_playlist[i] for i in val2_playlist])
+    val1_pids = pd.DataFrame(np.hstack([val1_playlist[i] for i in val1_playlist]))
+    val2_pids = pd.DataFrame(np.hstack([val2_playlist[i] for i in val2_playlist]))
     
     train = pd.concat([train, df_test_map])
     train.to_csv('./new_data/train.csv',index = None)
     val1.to_csv('./new_data/val1.csv',index = None)
     val2.to_csv('./new_data/val2.csv', index = None)
-    
+    val1_pids.to_csv('./new_data/val1_pids.csv', index = None)
+    val2_pids.to_csv('./new_data/val2_pids.csv', index = None)
 if __name__=='__main__':
-          validation()  
+    validation()  
             
             
             

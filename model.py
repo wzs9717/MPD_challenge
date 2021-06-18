@@ -12,7 +12,6 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.models import load_model
-from surprise.prediction_algorithms.knns import KNNBasic,KNNWithMeans,KNNWithZScore,KNNBaseline
 import numpy as np
 import pickle
 import pandas as pd 
@@ -43,11 +42,11 @@ def define_Hyper_pare():
                 'subsample_for_bin':20000
                 }
         fm_para={
-                'n_components':10,
+                'no_components':10,
                 # no_components=200, loss='warp', learning_rate=0.02, max_sampled=400, random_state=1, user_alpha=1e-05
         }
         fm_para_text={
-                'n_components':10,
+                'no_components':10,
                 #     no_components=200, 
                 #     loss='warp', 
                 #     learning_rate=0.03, 
@@ -55,7 +54,7 @@ def define_Hyper_pare():
                 #     random_state=1,
                 #     user_alpha=1e-05,
         }
-        return cv_num,num_class,lgbm_para,fm_para
+        return cv_num,num_class,lgbm_para,fm_para,fm_para_text
 cv_num,num_class,lgbm_para,fm_para,fm_para_text=define_Hyper_pare()
 
 class TwoStageModel:
@@ -66,17 +65,11 @@ class TwoStageModel:
         def define_first_stage_models(self,fm_para=None,fm_para_text=None):
                 models={}
                 if fm_para:
-                        model['lightfm']=LightFM(**fm_para)
+                        models['lightfm']=LightFM(**fm_para)
                 if fm_para_text:
-                        model['lightfm_text']=LightFM(**fm_para)
+                        models['lightfm_text']=LightFM(**fm_para)
                 return models
 
-        def first_stage_models_predict(self,X,model_name):
-                saved_model_name='./checkpoints/%s_%s.sav'%(model_name)
-                model = pickle.load(open(saved_model_name, 'rb'))
-                prob= pd.DataFrame(model.transform(X.values),index=X.index)
-                return prob
-        
         def predict(self,X):
                 prob_train_list=[]
                 for model_name in self.first_stage_models.keys():
@@ -88,7 +81,14 @@ class TwoStageModel:
                 prob=pd.DataFrame(self.second_stage_model.predict(prob_train_mean),index=X.index)   
                 return prob
 
-        # def train(self,train_X1,train_Y1,train_X2,train_Y2,test_X,test_Y):
+        def first_stage_models_predict(self,X,model_name):
+                saved_model_name='./checkpoints/%s_%s.sav'%(model_name)
+                model = pickle.load(open(saved_model_name, 'rb'))
+                prob= pd.DataFrame(model.transform(X.values),index=X.index)
+                return prob
+        
+
+
         def train(self,playlist,tracks,map_train,map_val1,map_val2,val1_pids,val2_pids):
                 
                 self.train_first_stage_fm_models('lightfm',self.first_stage_models['lightfm'],map_train,val1_pids)
@@ -106,13 +106,13 @@ class TwoStageModel:
                 best_recall = 0
                 for i in range(config['epochs_stage1']):      
                         model.fit_partial(train_X_sparse, epochs=config['steps_per_epoch_epoch_stage1'])
-                        recall=recall_at_k(model, val1_pids.pid, k=config['top_k_stage1']).mean()
+                        recall=recall_at_k(model, val1_pids.values, k=config['top_k_stage1']).mean()
                         print('best_recall:',best_recall,'current_recal:',recall)
                         if recall > best_recall:
                                 pickle.dump(model, open(saved_model_name, 'wb'))
                                 best_recall = recall
 
-        def train_first_stage_fm_text_models(self,model_name,model,playlist,tracks,map_train,map_val1)
+        def train_first_stage_fm_text_models(self,model_name,model,playlist,tracks,map_train,map_val1):
                 print('\n----------->>fitting fm_text model: ',model_name)
                 playlist_name = playlist.set_index('pid').name.sort_index()
                 playlist_name = playlist_name.reindex(np.arange(config['num_playlists'])).fillna('')#expand from train size to train+test size
@@ -126,13 +126,13 @@ class TwoStageModel:
                                                 (np.ones(len(train_X)), (train_X.pid, train_X.tid)),
                                                 shape=(config['num_playlists'], config['num_tracks'])
                                                 )   
-                zeros_pids = np.array(list(set(val1_pids).difference(train.pid.unique())))#pid of val1-val1^train
-                no_zeros_pids = np.array(list(set(val1_pids).difference(zeros_pids))[:1000])#pid of val1^train
+                zeros_pids = np.array(list(set(val1_pids.values).difference(train.pid.unique())))#pid of val1-val1^train
+                no_zeros_pids = np.array(list(set(val1_pids.values).difference(zeros_pids))[:1000])#pid of val1^train
                 #-------------------------------------------train the fm model-------------------------------------------
                 best_recall = 0
                 for i in range(config['epochs_stage1']):      
                         model.fit_partial(train_X_sparse, epochs=config['steps_per_epoch_epoch_stage1'], user_features=user_features)
-                        recall=recall_at_k(model, zeros_pids[['pid']], k=config['top_k_stage1']).mean()
+                        recall=recall_at_k(model, zeros_pids, k=config['top_k_stage1']).mean()
                         recall_no_zeros=recall_at_k(model, no_zeros_pids[['pid']], k=config['top_k_stage1']).mean()
                         print('best_recall:',best_recall,'current_recal:',recall,'current_recal_no_zeros:',recall_no_zeros)
                         if recall > best_recall:
