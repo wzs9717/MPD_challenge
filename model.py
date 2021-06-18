@@ -46,7 +46,7 @@ def define_Hyper_pare():
                 'n_components':10,
                 # no_components=200, loss='warp', learning_rate=0.02, max_sampled=400, random_state=1, user_alpha=1e-05
         }
-        fm_text_para={
+        fm_para_text={
                 'n_components':10,
                 #     no_components=200, 
                 #     loss='warp', 
@@ -89,14 +89,12 @@ class TwoStageModel:
                 return prob
 
         # def train(self,train_X1,train_Y1,train_X2,train_Y2,test_X,test_Y):
-        def train(self,playlist,tracks,map_train,map_val1,map_val2):
- 
-                self.train_first_stage_fm_models('lightfm',self.first_stage_models['lightfm'],playlist,tracks,map_train,map_val1)
-                self.train_first_stage_fm_text_models('lightfm',self.first_stage_models['lightfm'],playlist,tracks,map_train,map_val1)
+        def train(self,playlist,tracks,map_train,map_val1,map_val2,val1_pids,val2_pids):
+                
+                self.train_first_stage_fm_models('lightfm',self.first_stage_models['lightfm'],map_train,val1_pids)
+                self.train_first_stage_fm_text_models('lightfm_text',self.first_stage_models['lightfm_text'],playlist,tracks,map_train,map_val1)
 
-                return prob_train1_list,prob_train2,prob_test
-
-        def train_first_stage_fm_models(self,model_name,model,playlist,tracks,map_train,map_val1):
+        def train_first_stage_fm_models(self,model_name,model,map_train,val1_pids):
                 print('\n----------->>fitting fm model: ',model_name)
                 
                 saved_model_name='./checkpoints/%s.sav'%(model_name)
@@ -108,7 +106,7 @@ class TwoStageModel:
                 best_recall = 0
                 for i in range(config['epochs_stage1']):      
                         model.fit_partial(train_X_sparse, epochs=config['steps_per_epoch_epoch_stage1'])
-                        recall=recall_at_k(model, map_val1.pid, k=config['top_k_stage1']).mean())
+                        recall=recall_at_k(model, val1_pids.pid, k=config['top_k_stage1']).mean()
                         print('best_recall:',best_recall,'current_recal:',recall)
                         if recall > best_recall:
                                 pickle.dump(model, open(saved_model_name, 'wb'))
@@ -117,51 +115,30 @@ class TwoStageModel:
         def train_first_stage_fm_text_models(self,model_name,model,playlist,tracks,map_train,map_val1)
                 print('\n----------->>fitting fm_text model: ',model_name)
                 playlist_name = playlist.set_index('pid').name.sort_index()
-                playlist_name = playlist_name.reindex(np.arange(config['num_playlists'])).fillna('')
+                playlist_name = playlist_name.reindex(np.arange(config['num_playlists'])).fillna('')#expand from train size to train+test size
 
                 vectorizer = CountVectorizer(max_features=20000)
                 user_features = vectorizer.fit_transform(playlist_name)
-                user_features = sp.hstack([sp.eye(config['num_playlists']), user_features])
+                user_features = sp.hstack([sp.eye(config['num_playlists']), user_features])#??
 
                 saved_model_name='./checkpoints/%s.sav'%(model_name)
                 train_X_sparse = sp.coo_matrix(
                                                 (np.ones(len(train_X)), (train_X.pid, train_X.tid)),
                                                 shape=(config['num_playlists'], config['num_tracks'])
                                                 )   
-                zeros_pids = np.array(list(set(val1_pids).difference(train.pid.unique())))#pid of val-val^train
-                no_zeros_pids = np.array(list(set(val1_pids).difference(zeros_pids))[:1000])#pid of val^train
+                zeros_pids = np.array(list(set(val1_pids).difference(train.pid.unique())))#pid of val1-val1^train
+                no_zeros_pids = np.array(list(set(val1_pids).difference(zeros_pids))[:1000])#pid of val1^train
                 #-------------------------------------------train the fm model-------------------------------------------
                 best_recall = 0
                 for i in range(config['epochs_stage1']):      
                         model.fit_partial(train_X_sparse, epochs=config['steps_per_epoch_epoch_stage1'], user_features=user_features)
-                        recall=recall_at_k(model, test_X[['pid']], k=config['top_k_stage1']).mean())
-                        print('best_recall:',best_recall,'current_recal:',recall)
+                        recall=recall_at_k(model, zeros_pids[['pid']], k=config['top_k_stage1']).mean()
+                        recall_no_zeros=recall_at_k(model, no_zeros_pids[['pid']], k=config['top_k_stage1']).mean()
+                        print('best_recall:',best_recall,'current_recal:',recall,'current_recal_no_zeros:',recall_no_zeros)
                         if recall > best_recall:
                                 pickle.dump(model, open(saved_model_name, 'wb'))
                                 best_recall = recall
-                        score = []
-                        score2 = []
-                        
-                        for pid in zeros_pids:
-                                tracks_t = val_tracks[pid]
-                                tracks = [i for i in res[pid][0] if i not in user_seen.get(pid, set())][:len(tracks_t)]
-                                guess = np.sum([i in tracks_t for i in tracks])
-                                score.append(guess / len(tracks_t))
-                        
-                        for pid in no_zeros_pids:
-                                tracks_t = val_tracks[pid]
-                                tracks = [i for i in res[pid][0] if i not in user_seen.get(pid, set())][:len(tracks_t)]
-                                guess = np.sum([i in tracks_t for i in tracks])
-                                score2.append(guess / len(tracks_t))
-                        
-                        score = np.mean(score)
-                        score2 = np.mean(score2)
-                        
-                        print(score, score2)
-                        if score > best_score:
-                                pickle.dump(model, open(saved_model_name, 'wb'))
-                                best_score = score
-                pickle.dump(user_features, open('checkpoints/user_features.pkl', 'wb'))
+                pickle.dump(user_features, open('./new_data/user_features.pkl', 'wb'))
 
         def train_second_stage_model(self,train_X,train_Y):
                 print('\n----------->>fitting 2nd model: ')
