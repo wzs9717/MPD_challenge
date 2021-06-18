@@ -14,6 +14,7 @@ def parsed_tracks():
                 'num_followers', 'num_tracks', 'pid']
     Feature_tracks = ['album_name', 'album_uri', 'artist_name', 'artist_uri', 
                   'duration_ms', 'track_name', 'track_uri'] 
+    Feature_playlist_test = ['name', 'num_holdouts', 'num_samples', 'num_tracks', 'pid']
 
     if not os.path.exists('./new_data'):
         os.makedirs('./new_data')
@@ -22,7 +23,7 @@ def parsed_tracks():
     pl_track_map=[]#[pid,tid,pos]
     pl_all=[]
     c=1
-    for file in files[:]:
+    for file in files[:]:#
         print(c)
         data = json.load(open(file))
         df = pd.DataFrame(data["playlists"])
@@ -51,6 +52,9 @@ def parsed_tracks():
         df_tracks_all=pd.concat([df_tracks_all]+tracks_all,ignore_index=True)
     df_tracks_all=df_tracks_all.drop_duplicates(subset=['track_uri'],ignore_index=True)
     df_pl_track_map=pd.DataFrame(pl_track_map,columns=['pid', 'tid', 'pos'])
+    
+    
+    
     df_pl_all=pd.concat(pl_all,axis=0,ignore_index=True)
 
     df_pl_all['collaborative'] = df_pl_all['collaborative'].map({'false': 0, 'true': 1})
@@ -62,6 +66,8 @@ def parsed_tracks():
     df_tracks_all.to_csv("./new_data/tracks.csv", index = None)
     df_pl_track_map.to_csv("./new_data/pl_track_map.csv", index = None)
     df_pl_all.to_csv("./new_data/play_list.csv", index = None)
+    return track_uri2tid
+
 
 def comple_tracks():
     file_cname='./new_data/track*.csv'
@@ -76,7 +82,7 @@ def comple_tracks():
     df_ctracks_all.reset_index(drop=True)
     return df_ctracks_all
 
-if __name__=='__main__':
-    parsed_tracks()
+# if __name__=='__main__':
+#     parsed_tracks()
     # comple_tracks()
         
