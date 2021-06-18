@@ -10,6 +10,8 @@ from sklearn.datasets import load_svmlight_file
 from sklearn.metrics import accuracy_score
 from matplotlib import pyplot
 
+pd.options.display.max_columns = 100
+
 def xg_model():
     param_dist = {'objective':'binary:logistic', 'n_estimators':2}
     X_train,X_test,y_train,y_test=data_gene()
