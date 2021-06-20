@@ -27,7 +27,8 @@ def validation():
             validation_playlists[i] = np.random.choice(num_tracks.loc[i], 2*j, replace=True)#??
          #{5:[‘summer’,winter]
     # 10,[‘daoxiang’,‘daoxiang’]}
-    
+        else:
+            print('warning: j not in num_tracks.index')
     val1_playlist = {}
     val2_playlist = {}
     for i in [0, 1, 5, 10, 25, 100]:
@@ -43,6 +44,8 @@ def validation():
                 
                 val2_playlist[i] += list(validation_playlists[j][:k])
                 validation_playlists[j] = validation_playlists[j][k:]
+            else:
+                print('warning: j not in num_tracks.index')
     val1_index = df_playlists_map.pid.isin(val1_playlist[0])
     val2_index = df_playlists_map.pid.isin(val2_playlist[0])
     for i in [1, 5, 10, 25, 100]:
@@ -54,8 +57,8 @@ def validation():
     val1 = df_playlists_map[val1_index]
     val2 = df_playlists_map[val2_index]
     
-    val1_pids = pd.DataFrame(np.hstack([val1_playlist[i] for i in val1_playlist]))
-    val2_pids = pd.DataFrame(np.hstack([val2_playlist[i] for i in val2_playlist]))
+    val1_pids = pd.DataFrame(np.hstack([val1_playlist[i] for i in val1_playlist]),colums=['pid'])
+    val2_pids = pd.DataFrame(np.hstack([val2_playlist[i] for i in val2_playlist]),colums=['pid'])
     
     train = pd.concat([train, df_test_map])
     train.to_csv('./new_data/train.csv',index = None)

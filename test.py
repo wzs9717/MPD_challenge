@@ -1,6 +1,7 @@
 from lightfm import LightFM
 from lightfm.datasets import fetch_movielens
 from lightfm.evaluation import precision_at_k
+import pandas as pd
 import numpy as np
 # Load the MovieLens 100k dataset. Only five
 # star ratings are treated as positive.
