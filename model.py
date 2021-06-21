@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from lightfm import LightFM
 from lightfm.evaluation import recall_at_k
 
+import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.optimizers import Adam, SGD
@@ -93,27 +94,36 @@ class TwoStageModel:
                 # self.train_first_stage_fm_models('lightfm',self.first_stage_models['lightfm'],map_train,map_val1,map_val2,val1_pids,val2_pids)
                 # self.train_first_stage_fm_text_models('lightfm_text',self.first_stage_models['lightfm_text'],playlist,tracks,map_train,map_val1,map_val2,val1_pids,val2_pids)
                 user_seen = set(zip(map_train.pid, map_train.tid))
-                save_candidates(
+                print('saving candidates')
+                self.save_candidates(
+                                map_train,
                                 val1_pids.values,
                                 map_val1.pid.value_counts(),
                                 'res/ii_candidate.csv',
                                 map_val1,
                                 user_seen
                                 )
-                save_candidates(
+                self.save_candidates(
+                        map_train,
                                 val2_pids.values,
                                 map_val2.pid.value_counts(),
                                 'res/iii_candidate.csv',
                                 map_val2,
                                 user_seen
                                 )
-                save_candidates(
+                self.save_candidates(
+                        map_train,
                                 play_list_test.pid.values,
                                 play_list_test.set_index('pid').num_holdouts,
                                 'res/test_candidate.csv',
                                 None,
                                 user_seen
                                 )
+                print('creating lightfm features')
+                self.create_lightfm_features(pd.read_hdf('res/ii_candidate.csv'),'new_data/ii_lightfm_features.csv')#modefied!!
+                self.create_lightfm_features(pd.read_hdf('res/iii_candidate.csv'),'new_data/iii_lightfm_features.csv')
+                self.create_lightfm_features(pd.read_hdf('res/test_candidate.csv'),'new_data/test_lightfm_features.csv')
+
         def train_first_stage_fm_models(self,model_name,model,map_train,map_val1,map_val2,val1_pids,val2_pids):
                 print('\n----------->>fitting fm model: ',model_name)
                 
@@ -144,7 +154,8 @@ class TwoStageModel:
                 vectorizer = CountVectorizer(max_features=20000)
                 user_features = vectorizer.fit_transform(playlist_name)
                 user_features = sp.hstack([sp.eye(config['num_playlists']), user_features])#??
-
+                pickle.dump(user_features, open('./new_data/user_features.pkl', 'wb'))
+                print('saved user features')
                 saved_model_name='./checkpoints/%s.sav'%(model_name)
                 train_X_sparse = sp.coo_matrix(
                                                 (np.ones(map_train.shape[0]), (map_train.pid, map_train.tid)),
@@ -166,7 +177,7 @@ class TwoStageModel:
                         if recall > best_recall:
                                 pickle.dump(model, open(saved_model_name, 'wb'))
                                 best_recall = recall
-                pickle.dump(user_features, open('./new_data/user_features.pkl', 'wb'))
+                
 
         def train_second_stage_model(self,train_X,train_Y):
                 print('\n----------->>fitting 2nd model: ')
@@ -178,27 +189,33 @@ class TwoStageModel:
                 prob_train=model.predict(train_X)
                 return prob_train
 
-        def save_candidates(target_pids, df_size, file_name, df=None,user_seen=None):
+        def save_candidates(self,map_train,target_pids, df_size, file_name, df=None,user_seen=None):
                 '''
                 df_size:{pid:counts(pid)}
                 df:map
                 '''
+                print('0')
                 model = pickle.load(open('./checkpoints/lightfm.sav', 'rb'))
                 model_text = pickle.load(open('./checkpoints/lightfm_text.sav', 'rb'))
-                user_features = pickle.load(open('models/user_features.pkl', 'rb'))
-
-                target_pids_text = list(set(target_pids).difference(train.pid))
+                user_features = pickle.load(open('new_data/user_features.pkl', 'rb'))
+                target_pids=target_pids.T.tolist()[0]
+                print('1')
+                target_pids_text = list(set(target_pids).difference(map_train.pid))
                 target_pids_no_text = list(set(target_pids).difference(target_pids_text))
                 res_notext={}
                 res_text={}
+                print('2')
+                print(len(target_pids_text))
+                print(len(target_pids_no_text))
                 for i in target_pids_text:
-                        scores=model_text.predict(i, np.arange(config['num_tracks']))
-                        res_text[i]=np.argsort(-scores)[:10000]
-                for i in target_pids:
-                        scores=model.predict(i, np.arange(config['num_tracks']),user_features=user_features)
-                        res_notext[i]=np.argsort(-scores)[:10000]
+                        scores=model_text.predict(i, np.arange(config['num_tracks']),user_features=user_features)
+                        res_text[i]=np.argsort(-scores)[:100]
+                print('2.5')
+                for i in target_pids_no_text:
+                        scores=model.predict(i, np.arange(config['num_tracks']))
+                        res_notext[i]=np.argsort(-scores)[:100]
                 res=res_notext.update(res_text)
-
+                print('3')
                 if df is not None:
                         val_tracks = df.groupby('pid').tid.apply(set).to_dict()  #{pid:[tracks]}
                 
@@ -214,7 +231,7 @@ class TwoStageModel:
                         if df is not None:
                                 tracks_t = val_tracks[pid]
                                 targets += [i in tracks_t for i in res[pid][:l]]#tracs_true & track_predict_topl
-
+                print('4')
                 candidates = pd.DataFrame()
                 candidates['pid'] = np.array(pids)
                 candidates['tid'] = np.array(tids)
@@ -225,7 +242,36 @@ class TwoStageModel:
                 index = []
                 for pid, tid in candidates[['pid', 'tid']].values:
                         index.append((pid, tid) not in user_seen)
-
+                print('5')
                 candidates = candidates[index]
 
-                candidates.to_csv(file_name)
+                candidates.to_csv(file_name, index = None)
+
+        def create_lightfm_features(self,df,path):
+                user_features = pickle.load(open('models/user_features.pkl', 'rb'))
+                model_text = pickle.load(open('./checkpoints/lightfm_text.sav', 'rb'))
+
+                _user_repr_biases,_user_repr=model_text.get_user_representations(user_features)
+
+                df['pid_bias'] = model.user_biases[df.pid]
+                df['tid_bias'] = model.item_biases[df.tid]
+                
+                pid_embeddings = model.user_embeddings[df.pid]
+                tid_embeddings = model.item_embeddings[df.tid]
+                
+                df['lightfm_dot_product'] = (pid_embeddings * tid_embeddings).sum(axis=1)
+                df['lightfm_prediction'] = df['lightfm_dot_product'] + df['pid_bias'] + df['tid_bias']
+                
+                df['lightfm_rank'] = df.groupby('pid').lightfm_prediction.rank(ascending=False)
+                
+                df['pid_bias_text'] = _user_repr_biases[df.pid]
+                df['tid_bias_text'] = model_text.item_biases[df.tid]
+                
+                pid_embeddings = _user_repr[df.pid]
+                tid_embeddings = model_text.item_embeddings[df.tid]
+                
+                df['lightfm_dot_product_text'] = (pid_embeddings * tid_embeddings).sum(axis=1)
+                df['lightfm_prediction_text'] = df['lightfm_dot_product_text'] + df['pid_bias_text'] + df['tid_bias_text']
+                
+                df['lightfm_rank_text'] = df.groupby('pid').lightfm_prediction_text.rank(ascending=False)
+                df.to_csv(path, index = None)
