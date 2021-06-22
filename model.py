@@ -9,15 +9,12 @@ from lightfm import LightFM
 from lightfm.evaluation import recall_at_k
 
 import os
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.optimizers import Adam, SGD
-from tensorflow.keras.models import load_model
 import numpy as np
 import pickle
 import pandas as pd 
 import scipy.sparse as sp
 
+import glob
 from utils.__init__ import get_config
 config=get_config()
 
@@ -95,34 +92,34 @@ class TwoStageModel:
                 # self.train_first_stage_fm_text_models('lightfm_text',self.first_stage_models['lightfm_text'],playlist,tracks,map_train,map_val1,map_val2,val1_pids,val2_pids)
                 user_seen = set(zip(map_train.pid, map_train.tid))
                 print('saving candidates')
-                self.save_candidates(
-                                map_train,
-                                val1_pids.values,
-                                map_val1.pid.value_counts(),
-                                'res/ii_candidate.csv',
-                                map_val1,
-                                user_seen
-                                )
-                self.save_candidates(
-                        map_train,
-                                val2_pids.values,
-                                map_val2.pid.value_counts(),
-                                'res/iii_candidate.csv',
-                                map_val2,
-                                user_seen
-                                )
-                self.save_candidates(
-                        map_train,
-                                play_list_test.pid.values,
-                                play_list_test.set_index('pid').num_holdouts,
-                                'res/test_candidate.csv',
-                                None,
-                                user_seen
-                                )
-                print('creating lightfm features')
-                self.create_lightfm_features(pd.read_hdf('res/ii_candidate.csv'),'new_data/ii_lightfm_features.csv')#modefied!!
-                self.create_lightfm_features(pd.read_hdf('res/iii_candidate.csv'),'new_data/iii_lightfm_features.csv')
-                self.create_lightfm_features(pd.read_hdf('res/test_candidate.csv'),'new_data/test_lightfm_features.csv')
+                # self.save_candidates(
+                #                 map_train,
+                #                 val1_pids.values,
+                #                 map_val1.pid.value_counts(),
+                #                 './res/ii_candidate.csv',
+                #                 map_val1,
+                #                 user_seen
+                #                 )
+                # self.save_candidates(
+                #         map_train,
+                #                 val2_pids.values,
+                #                 map_val2.pid.value_counts(),
+                #                 './res/iii_candidate.csv',
+                #                 map_val2,
+                #                 user_seen
+                #                 )
+                # self.save_candidates(
+                #         map_train,
+                #                 play_list_test.pid.values.reshape([-1,1]),
+                #                 play_list_test.set_index('pid').num_holdouts,
+                #                 'res/test_candidate.csv',
+                #                 None,
+                #                 user_seen
+                #                 )
+                # print('creating lightfm features')
+                self.create_lightfm_features(pd.read_csv('res/ii_candidate.csv'),'new_data/ii_lightfm_features.csv')#modefied!!
+                self.create_lightfm_features(pd.read_csv('res/iii_candidate.csv'),'new_data/iii_lightfm_features.csv')
+                self.create_lightfm_features(pd.read_csv('res/test_candidate.csv'),'new_data/test_lightfm_features.csv')
 
         def train_first_stage_fm_models(self,model_name,model,map_train,map_val1,map_val2,val1_pids,val2_pids):
                 print('\n----------->>fitting fm model: ',model_name)
@@ -204,17 +201,40 @@ class TwoStageModel:
                 target_pids_no_text = list(set(target_pids).difference(target_pids_text))
                 res_notext={}
                 res_text={}
+                res={}
                 print('2')
                 print(len(target_pids_text))
                 print(len(target_pids_no_text))
+                c=1
+                num_candi_limits=1000
                 for i in target_pids_text:
                         scores=model_text.predict(i, np.arange(config['num_tracks']),user_features=user_features)
-                        res_text[i]=np.argsort(-scores)[:100]
+                        res[i]=np.argsort(-scores)[:num_candi_limits]
+                        if c%1000==0:
+                                pickle.dump(res, open('./res/candidate%s.pkl'%c, 'wb'))
+                                res={}
+                        c+=1
+                        print(c)
+                del model_text,user_features
+
                 print('2.5')
                 for i in target_pids_no_text:
                         scores=model.predict(i, np.arange(config['num_tracks']))
-                        res_notext[i]=np.argsort(-scores)[:100]
-                res=res_notext.update(res_text)
+                        res[i]=np.argsort(-scores)[:num_candi_limits]
+                        if c%1000==0:
+                                pickle.dump(res, open('./res/candidate%s.pkl'%c, 'wb'))
+                                res={}
+                        c+=1
+                        print(c)
+                pickle.dump(res, open('./res/candidate%s.pkl'%c, 'wb'))
+                del model
+
+                res={}
+                file_names=glob.glob('./res/candidate*.pkl')
+                
+                for file_name_tmp in file_names:
+                        res_tmp=pickle.load(open(file_name_tmp, 'rb'))
+                        res.update(res_tmp)
                 print('3')
                 if df is not None:
                         val_tracks = df.groupby('pid').tid.apply(set).to_dict()  #{pid:[tracks]}
@@ -223,7 +243,7 @@ class TwoStageModel:
                 tids = []
                 targets = []
                 for pid in target_pids:
-                        l = max(df_size[pid] * 15, 700 + df_size[pid])
+                        l = min(max(df_size[pid] * 15, 700 + df_size[pid]),num_candi_limits)
                         #l = 2000
                         pids += [pid] * l
                         tids += list(res[pid][:l])
@@ -246,9 +266,11 @@ class TwoStageModel:
                 candidates = candidates[index]
 
                 candidates.to_csv(file_name, index = None)
+                print('saved:',file_name)
 
         def create_lightfm_features(self,df,path):
-                user_features = pickle.load(open('models/user_features.pkl', 'rb'))
+                user_features = pickle.load(open('new_data/user_features.pkl', 'rb'))
+                model = pickle.load(open('./checkpoints/lightfm.sav', 'rb'))
                 model_text = pickle.load(open('./checkpoints/lightfm_text.sav', 'rb'))
 
                 _user_repr_biases,_user_repr=model_text.get_user_representations(user_features)
