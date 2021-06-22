@@ -13,3 +13,4 @@ checkpoints/
 *.joblib
 *.sav
 *.zip
+*.pkl

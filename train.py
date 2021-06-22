@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd 
-
+import os
 from model import TwoStageModel
 def main():
-    model=TwoStageModel()
+    if not os.path.exists('./res'):
+        os.makedirs('./res')
     # // load data
     df_tracks=pd.read_csv("./new_data/tracks.csv")
     df_pl=pd.read_csv("./new_data/play_list.csv")
@@ -19,8 +20,8 @@ def main():
     val2_pids = pd.read_csv("./new_data/val2_pids.csv")
 
     # // train first stage model
-    
-    model.train(df_pl,df_tracks,train_map,val1_map,val2_map,val1_pids,val2_pids)
+    model=TwoStageModel()
+    model.train(df_pl,df_tracks,train_map,val1_map,val2_map,val1_pids,val2_pids,df_pl_test)
     # // train second stage model
 
 if __name__ == "__main__":

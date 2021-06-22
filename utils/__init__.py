@@ -10,7 +10,7 @@ def get_config():
     config={}
     config['num_playlists']=df_pl_track_map_test.pid.max() + 1
     config['num_tracks']=df_tracks.tid.max() + 1
-    config['epochs_stage1']=10
+    config['epochs_stage1']=2
     config['steps_per_epoch_epoch_stage1']=1
     config['top_k_stage1']=600
     return config
