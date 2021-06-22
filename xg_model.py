@@ -12,6 +12,29 @@ from matplotlib import pyplot
 
 pd.options.display.max_columns = 100
 
+data = pd.read_csv('./new_data/train.csv')
+
+if data.index <0:
+    print(555555555)
+
+
+df_playlists = pd.read_csv('./new_data/play_list.csv') 
+df_test=pd.read_csv('./new_data/play_list_test.csv')
+
+df_tracks = pd.read_csv('./new_data/tracks.csv')
+
+df_tracks['album'] = LabelEncoder().fit_transform(tracks_info.album_uri)
+df_tracks['artist'] = LabelEncoder().fit_transform(tracks_info.artist_uri)
+
+train = pd.read_hdf('df_data/ii_candidate.hdf')
+val = pd.read_hdf('df_data/iii_candidate.hdf')
+test = pd.read_hdf('df_data/test_candidate.hdf')
+
+
+
+
+
+
 def xg_model():
     param_dist = {'objective':'binary:logistic', 'n_estimators':2}
     X_train,X_test,y_train,y_test=data_gene()
