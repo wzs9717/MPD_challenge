@@ -17,8 +17,8 @@ def create_co_occurence_features(df):
     co_occurence = [defaultdict(int) for i in range(num_items)]
     occurence = [0 for i in range(num_items)]
     for q, (_, df) in enumerate(df.groupby('pid')):
-        if q % 100000 == 0:
-            print(q / 10000)
+        # if q % 1000 == 0:
+        print(q)
         tids = list(df.tid)
         for i in tids:
             occurence[i] += 1#
@@ -37,7 +37,7 @@ def create_co_occurence_features(df):
     pids = df.pid.unique()
     seed = df[df.pid.isin(pids)]
     tid_seed = seed.groupby('pid').tid.apply(list)#？？？？
-    
+    print('2')
     co_occurence_seq = []
     for pid, tid in df[['pid', 'tid']].values:
         tracks = tid_seed.get(pid, [])
@@ -47,7 +47,7 @@ def create_co_occurence_features(df):
     df['co_occurence_min'] = [get_f(i, np.min) for i in co_occurence_seq]
     df['co_occurence_mean'] = [get_f(i, np.mean) for i in co_occurence_seq]
     df['co_occurence_median'] = [get_f(i, np.median) for i in co_occurence_seq]
-    
+    print('3')
     co_occurence_seq = []
     for pid, tid in df[['pid', 'tid']].values:
         tracks = tid_seed.get(pid, [])
@@ -58,7 +58,20 @@ def create_co_occurence_features(df):
     df['co_occurence_norm_mean'] = [get_f(i, np.mean) for i in co_occurence_seq]
     df['co_occurence_norm_median'] = [get_f(i, np.median) for i in co_occurence_seq]
     
-    return df
+ 
+    
+
+train = pd.read_csv('./res/ii_candidate.csv')
+val = pd.read_csv('./res/iii_candidate.csv')
+test = pd.read_csv('./res/test_candidate.csv')
+
+create_co_occurence_features(train)
+create_co_occurence_features(val)
+create_co_occurence_features(test)
+
+train.to_csv('./new_data/ii_co_occurence_features.csv')
+val.to_csv('./new_data/iii_co_occurence_features.csv')
+test.to_csv('./new_data/test_co_occurence_features.csv')
 
 # if __name__=='__main__':
 
